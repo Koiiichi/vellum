@@ -23,8 +23,14 @@ def get_gmail_service():
     creds = Credentials.from_authorized_user_file(GMAIL_TOKEN_PATH)
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        with open(GMAIL_TOKEN_PATH, "w") as f:
-            f.write(creds.to_json())
+        try:
+            with open(GMAIL_TOKEN_PATH, "w") as f:
+                f.write(creds.to_json())
+        except OSError as exc:
+            logger.warning(
+                f"could not persist refreshed token to {GMAIL_TOKEN_PATH}: {exc}. "
+                "Continuing with the in-memory token."
+            )
     return build("gmail", "v1", credentials=creds)
 
 

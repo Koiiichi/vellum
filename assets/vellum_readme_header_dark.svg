@@ -1,0 +1,10 @@
+<svg width="240" height="70" viewBox="0 0 240 70" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Vellum</title>
+  <desc>Vellum README header — dark mode variant</desc>
+  <path d="M5,0 L31,0 L48,17 L48,53 Q48,58 43,58 L5,58 Q0,58 0,53 L0,5 Q0,0 5,0 Z"
+        fill="#111111" stroke="#ffffff" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polygon points="31,0 48,17 31,17" fill="#ffffff"/>
+  <text x="62" y="43"
+        font-family="'Space Grotesk', system-ui, -apple-system, sans-serif"
+        font-weight="500" font-size="36" letter-spacing="0.03em" fill="#ffffff">vellum</text>
+</svg>

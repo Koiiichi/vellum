@@ -13,7 +13,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from agent import mailer, packager, scraper, summarizer
+from agent import mailer, packager, scraper, storage, summarizer
 from core import config
 from core.logger import get_logger, set_request_id
 from core.models import JobResult, ParsedRequest
@@ -125,10 +125,28 @@ async def process_request(parsed: ParsedRequest, dry_run: bool = False) -> JobRe
         return result(False, downloaded, "all_tabs_empty")
 
     zip_path = packager.build(scrape_result, parsed.request_id, job_dir)
-    html_body = summarizer.render_success(metadata)
+
+    download_url: str | None = None
+    attachment: Path | None = zip_path
+    size_mb = zip_path.stat().st_size / (1024 * 1024)
+    if config.GCS_BUCKET and size_mb > config.MAX_ATTACHMENT_MB and not dry_run:
+        download_url = await asyncio.to_thread(
+            storage.upload_archive, zip_path, parsed.request_id
+        )
+        attachment = None
+        logger.info(
+            "archive too large to attach, sending download link",
+            extra={
+                "step": "queue.deliver",
+                "size_mb": round(size_mb, 1),
+                "limit_mb": config.MAX_ATTACHMENT_MB,
+            },
+        )
+
+    html_body = summarizer.render_success(metadata, download_url=download_url)
     subject = summarizer.build_subject(metadata)
 
-    await _deliver(parsed.sender_email, subject, html_body, zip_path, dry_run)
+    await _deliver(parsed.sender_email, subject, html_body, attachment, dry_run)
 
     logger.info(
         "job complete",
@@ -137,6 +155,7 @@ async def process_request(parsed: ParsedRequest, dry_run: bool = False) -> JobRe
             "matter_number": parsed.matter_number,
             "downloaded": downloaded,
             "zip_path": str(zip_path),
+            "download_url": download_url,
             "dry_run": dry_run,
         },
     )

@@ -11,6 +11,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
+from core import config
 from core.models import VALID_DOC_TYPES, MatterMetadata
 
 _TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "templates"
@@ -170,8 +171,8 @@ def _counts_sentence(metadata: MatterMetadata) -> str:
     return "I found " + _english_join(series)
 
 
-def _download_sentence(metadata: MatterMetadata) -> str:
-    """Compose a sentence describing what was downloaded and attached."""
+def _download_sentence(metadata: MatterMetadata, download_url: str | None = None) -> str:
+    """Compose a sentence describing what was downloaded and how to retrieve it."""
     clauses: list[str] = []
     for doc_type in metadata.requested_types:
         downloaded = metadata.downloaded.get(doc_type, 0)
@@ -183,6 +184,12 @@ def _download_sentence(metadata: MatterMetadata) -> str:
             "None of the document types you requested contained downloadable "
             "filings yet"
         )
+    if download_url:
+        return (
+            "I downloaded "
+            + _english_join(clauses)
+            + " and packaged them as a ZIP you can download using the button below"
+        )
     return (
         "I downloaded "
         + _english_join(clauses)
@@ -190,7 +197,7 @@ def _download_sentence(metadata: MatterMetadata) -> str:
     )
 
 
-def build_prose_summary(metadata: MatterMetadata) -> str:
+def build_prose_summary(metadata: MatterMetadata, download_url: str | None = None) -> str:
     """Compose a conversational, HTML-safe summary paragraph for the matter.
 
     The greeting is static markup; all metadata-derived text is escaped before
@@ -225,18 +232,77 @@ def build_prose_summary(metadata: MatterMetadata) -> str:
         sentences.append(f"The matter had an initial filing on {received}.")
 
     sentences.append(_counts_sentence(metadata) + ".")
-    sentences.append(_download_sentence(metadata) + ".")
+    sentences.append(_download_sentence(metadata, download_url) + ".")
 
     body = " ".join(sentences)
     return "Hi there,<br><br>" + html.escape(body)
 
 
+def _logo_html() -> str:
+    """Render the header logo as a hosted image, falling back to a text wordmark.
 
-def render_success(metadata: MatterMetadata) -> str:
-    """Render the branded success email body for a completed scrape."""
+    Email clients render inline SVG inconsistently, so a hosted PNG referenced
+    via ``<img>`` is used when a logo URL is configured.
+    """
+    url = config.EMAIL_LOGO_URL
+    if url:
+        safe = html.escape(url, quote=True)
+        return (
+            f'<img id="vellum-logo" src="{safe}" width="160" height="46" alt="Vellum" '
+            'style="display:block; border:0; outline:none; text-decoration:none;">'
+        )
+    return (
+        '<span style="font-size:25px; font-weight:500; letter-spacing:0.03em; '
+        'color:#111111;">vellum</span>'
+    )
+
+
+def _logo_dark_style() -> str:
+    """Emit a prefers-color-scheme media query that swaps in the dark logo."""
+    dark_url = config.EMAIL_LOGO_DARK_URL
+    if not dark_url or not config.EMAIL_LOGO_URL:
+        return ""
+    safe = html.escape(dark_url, quote=True)
+    return (
+        '<style type="text/css">'
+        "@media (prefers-color-scheme: dark) {"
+        f'#vellum-logo {{ content: url("{safe}") !important; }}'
+        "}"
+        "</style>"
+    )
+
+
+def _download_link_block(download_url: str | None) -> str:
+    """Render a download button row, or an empty string when attaching."""
+    if not download_url:
+        return ""
+    safe_url = html.escape(download_url, quote=True)
+    days = config.DELIVERY_RETENTION_DAYS
+    return (
+        '<tr><td style="padding:4px 8px 24px 8px;">'
+        f'<a href="{safe_url}" '
+        'style="display:inline-block; background-color:#111111; color:#ffffff; '
+        "text-decoration:none; font-size:14px; font-weight:500; padding:12px 24px; "
+        'border-radius:8px;">Download ZIP</a>'
+        '<div style="padding:8px 0 0 0; font-size:12px; color:#6b7280;">'
+        f"This link will remain available for {days} days.</div>"
+        "</td></tr>"
+    )
+
+
+
+def render_success(metadata: MatterMetadata, download_url: str | None = None) -> str:
+    """Render the branded success email body for a completed scrape.
+
+    When ``download_url`` is provided the archive is offered as a download link
+    rather than an attachment, for archives too large to attach to email.
+    """
     template = _load_template("email_success.html")
     tokens = {
-        "PROSE_SUMMARY": build_prose_summary(metadata),
+        "LOGO": _logo_html(),
+        "LOGO_DARK_STYLE": _logo_dark_style(),
+        "PROSE_SUMMARY": build_prose_summary(metadata, download_url),
+        "DOWNLOAD_LINK": _download_link_block(download_url),
         "MATTER_NUMBER": _esc(metadata.matter_number),
         "TITLE": _esc(metadata.title),
         "MATTER_TYPE": _esc(metadata.matter_type),
@@ -273,6 +339,8 @@ def render_error(error_code: str, context: dict | None = None) -> str:
 
     template = _load_template("email_error.html")
     tokens = {
+        "LOGO": _logo_html(),
+        "LOGO_DARK_STYLE": _logo_dark_style(),
         "ERROR_HEADLINE": html.escape(headline),
         "ERROR_BODY": html.escape(body),
         "ERROR_DETAIL": detail,

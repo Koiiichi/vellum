@@ -154,7 +154,7 @@ async def _assert_session_alive(page: Page) -> None:
 
 async def _navigate_to_matter(page: Page, matter_number: str) -> None:
     """Open the portal, type the matter number, and search for it."""
-    await page.goto(config.UARB_BASE_URL, wait_until="networkidle")
+    await page.goto(config.UARB_BASE_URL, wait_until="domcontentloaded")
 
     matter_textarea = _matter_input(page)
     try:
@@ -164,7 +164,7 @@ async def _navigate_to_matter(page: Page, matter_number: str) -> None:
 
     await matter_textarea.click()
     await page.wait_for_timeout(300)
-    await page.keyboard.press("Meta+a")
+    await page.keyboard.press("Control+a")
     await page.keyboard.type(matter_number, delay=50)
 
     search_button = page.locator(SELECTORS["search_button"], has_text=SEARCH_TEXT).last
@@ -450,7 +450,16 @@ async def run(
     browser: Browser | None = None
 
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=config.SCRAPER_HEADLESS)
+        browser = await playwright.chromium.launch(
+            headless=config.SCRAPER_HEADLESS,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-crashpad",
+                "--disable-breakpad",
+            ],
+        )
         try:
             page = await browser.new_page()
             await _navigate_to_matter(page, matter_number)

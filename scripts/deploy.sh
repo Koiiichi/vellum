@@ -43,13 +43,15 @@ gcloud run deploy "${SERVICE}" \
   --project="${PROJECT_ID}" \
   --platform=managed \
   --allow-unauthenticated \
+  --execution-environment=gen2 \
   --port=8080 \
   --memory=2Gi \
   --cpu=2 \
   --timeout=900 \
   --concurrency=2 \
-  --min-instances=0 \
+  --min-instances=1 \
   --max-instances=2 \
+  --no-cpu-throttling \
   --set-secrets="/secrets/credentials/credentials.json=vellum-credentials:latest,/secrets/token/token.json=vellum-token:latest" \
   --set-env-vars="GMAIL_CREDENTIALS_PATH=/secrets/credentials/credentials.json,GMAIL_TOKEN_PATH=/secrets/token/token.json,$(grep -v '^#' .local.env | grep '=' | grep -v 'GMAIL_CREDENTIALS_PATH\|GMAIL_TOKEN_PATH\|^PORT=' | tr '\n' ',' | sed 's/,$//')" \
   --quiet

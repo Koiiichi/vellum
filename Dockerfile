@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements.txt .
 RUN pip install --no-cache-dir \
     playwright==1.60.0 \
     fastapi==0.138.1 \
@@ -18,8 +17,10 @@ RUN pip install --no-cache-dir \
     pydantic==2.13.4 \
     python-dotenv==1.2.2 \
     "google-api-python-client==2.198.0" \
-    "google-auth-oauthlib==1.4.0"
+    "google-auth-oauthlib==1.4.0" \
+    "google-cloud-storage==3.12.0"
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install chromium --with-deps
 
 RUN groupadd --gid 1001 vellum && \

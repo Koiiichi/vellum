@@ -1,7 +1,10 @@
 # vellum
 
 <p align="center">
-  <img src="assets/vellum_readme_header.svg" width="200" alt="vellum" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/vellum_readme_header_dark.svg">
+    <img src="assets/vellum_readme_header.svg" width="200" alt="vellum" />
+  </picture>
 </p>
 
 An async, event-driven agent that monitors a Gmail inbox, scrapes regulatory
