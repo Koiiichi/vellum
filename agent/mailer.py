@@ -68,6 +68,18 @@ def _extract_html_body(message: EmailMessage) -> str:
     return ""
 
 
+def _extract_text_body(message: EmailMessage) -> str:
+    """Extract the plain-text alternative from a MIME message."""
+    plain_part = message.get_body(preferencelist=("plain",))
+    if plain_part is not None:
+        return plain_part.get_content()
+
+    if message.get_content_type() == "text/plain":
+        return message.get_content()
+
+    return ""
+
+
 def _send_sync(message: EmailMessage) -> None:
     """Send a prepared message through Resend's Python SDK."""
     api_key = config.RESEND_API_KEY
@@ -82,6 +94,7 @@ def _send_sync(message: EmailMessage) -> None:
         "to": [message["To"]],
         "subject": message["Subject"],
         "html": _extract_html_body(message),
+        "text": _extract_text_body(message),
     }
 
     try:

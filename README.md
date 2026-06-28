@@ -53,8 +53,9 @@ flowchart LR
     WK --> S[scraper - Playwright]
     S --> PK[packager - ZIP + job_summary.json]
     PK --> SM[summarizer - HTML body]
-    SM --> M[mailer - Gmail API reply + attachment]
-    M --> G
+    PK --> ST[GCS delivery link]
+    SM --> M[mailer - Resend reply]
+    M --> U[User inbox]
 ```
 
 The webhook acknowledges Pub/Sub immediately and puts the job onto an
@@ -74,13 +75,11 @@ pipeline, bounding concurrent Playwright sessions to avoid hammering the UARB si
    `gmail-api-push@system.gserviceaccount.com` the `roles/pubsub.publisher`
    role on the topic.
 3. Create OAuth2 Desktop credentials, download them as `credentials.json`, and
-   run the authorization flow once. The OAuth token needs both Gmail read/watch
-   access and Gmail send access:
+   run the authorization flow once. The OAuth token needs Gmail read/watch
+   access so Vellum can process inbound requests:
    ```bash
    uv run python scripts/authorize.py
    ```
-   If you already have a `token.json` from an older Vellum setup, rerun this
-   step so the token includes `https://www.googleapis.com/auth/gmail.send`.
 4. Copy `.env.example` to `.local.env` and fill in your values.
 5. Deploy to Cloud Run:
    ```bash
@@ -111,6 +110,7 @@ pipeline, bounding concurrent Playwright sessions to avoid hammering the UARB si
 | `SELECTOR_TIMEOUT_MS` | Explicit wait timeout for selectors (default 15000). |
 | `SCRAPER_HEADLESS` | Run Chromium headless (default true). |
 | `EMAIL_FROM` / `EMAIL_FROM_NAME` | Reply sender address and display name. |
+| `RESEND_API_KEY` | Resend API key used for outbound replies. |
 | `MAILER_SEND_RETRY_ATTEMPTS` | Gmail send attempts before surfacing delivery failure (default 3). |
 | `MAILER_RETRY_BASE_DELAY_S` | Base backoff for retryable mailer errors without provider retry hints (default 2). |
 | `MAILER_MAX_RETRY_DELAY_S` | Maximum delay between Gmail send retries in seconds (default 900). |
@@ -132,8 +132,56 @@ pipeline, bounding concurrent Playwright sessions to avoid hammering the UARB si
    type and writes `job_summary.json`.
 5. **Summarizer** (`agent/summarizer.py`) renders the HTML email body and
    subject line from the matter metadata.
-6. **Mailer** (`agent/mailer.py`) sends the reply with the ZIP attached through
-   the Gmail API.
+6. **Storage** (`agent/storage.py`) uploads the ZIP to Cloud Storage and
+   produces a temporary download link.
+7. **Mailer** (`agent/mailer.py`) sends the reply through Resend with the
+   download link in the HTML body.
+
+## Monitoring Logs
+
+Set these values for your deployment:
+
+```bash
+PROJECT_ID="your-google-cloud-project-id"
+REGION="your-cloud-run-region"
+SERVICE="vellum"
+```
+
+Check which Cloud Run revision is live:
+
+```bash
+gcloud run services describe "${SERVICE}" \
+  --project="${PROJECT_ID}" \
+  --region="${REGION}" \
+  --format='table(status.latestReadyRevisionName,status.latestCreatedRevisionName,status.traffic[0].revisionName,status.traffic[0].percent)'
+```
+
+Read the latest Vellum logs:
+
+```bash
+gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE}\"" \
+  --project="${PROJECT_ID}" \
+  --limit=80 \
+  --freshness=20m \
+  --format='table(timestamp,resource.labels.revision_name,jsonPayload.request_id,jsonPayload.step,jsonPayload.level,jsonPayload.message,jsonPayload.matter_number,jsonPayload.document_types,jsonPayload.error_type,jsonPayload.reason)'
+```
+
+Follow one request after you have its `request_id`:
+
+```bash
+REQUEST_ID="paste-request-id-here"
+gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE}\" AND jsonPayload.request_id=\"${REQUEST_ID}\"" \
+  --project="${PROJECT_ID}" \
+  --limit=200 \
+  --format='table(timestamp,jsonPayload.step,jsonPayload.level,jsonPayload.message,jsonPayload.downloaded,jsonPayload.download_url,jsonPayload.error_type,jsonPayload.reason)'
+```
+
+Healthy delivery ends with:
+
+```text
+mailer.send     INFO  email sent
+queue.complete  INFO  job complete
+```
 
 ## Development
 

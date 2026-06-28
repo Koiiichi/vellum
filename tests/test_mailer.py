@@ -36,6 +36,7 @@ async def test_send_plain_html(fake_resend):
             "to": ["dest@example.com"],
             "subject": "[Vellum] M12205",
             "html": "<p>hello</p>\n",
+            "text": "Your email client does not support HTML. Please view this message in an HTML-capable client to see your Vellum results.\n",
         }
     ]
 
@@ -49,6 +50,7 @@ async def test_send_with_attachment_posts_resend_payload(fake_resend, tmp_path):
     assert fake_resend[0]["to"] == ["dest@example.com"]
     assert fake_resend[0]["subject"] == "subject"
     assert fake_resend[0]["html"] == "<p>body</p>\n"
+    assert fake_resend[0]["text"].startswith("Your email client does not support HTML.")
 
 
 def test_extract_html_body_prefers_html_alternative():
@@ -57,6 +59,14 @@ def test_extract_html_body_prefers_html_alternative():
     message.add_alternative("<p>html body</p>", subtype="html")
 
     assert mailer._extract_html_body(message) == "<p>html body</p>\n"
+
+
+def test_extract_text_body_prefers_plain_alternative():
+    message = EmailMessage()
+    message.set_content("plain body")
+    message.add_alternative("<p>html body</p>", subtype="html")
+
+    assert mailer._extract_text_body(message) == "plain body\n"
 
 
 async def test_send_requires_resend_api_key(monkeypatch):
@@ -108,6 +118,7 @@ async def test_send_supports_resend_client_shape(monkeypatch):
                 "to": ["dest@example.com"],
                 "subject": "subject",
                 "html": "<p>body</p>\n",
+                "text": "Your email client does not support HTML. Please view this message in an HTML-capable client to see your Vellum results.\n",
             },
         )
     ]
