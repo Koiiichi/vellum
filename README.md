@@ -11,15 +11,7 @@ documents and a structured metadata summary.
 
 ## Using Vellum
 
-Vellum is already running. Send an email to **vellum.agent@gmail.com** with a
-subject line that includes `[vellum]`, the matter number, and the document
-types you want.
-
-### Subject line format
-
-```
-[vellum] <document types> for <matter number>
-```
+Vellum is already running. Send an email to **vellum.agent@gmail.com** with `[vellum]` anywhere in the subject line. The rest is free-form — put the matter number and document types in the subject or the body, however is natural.
 
 ### Examples
 
@@ -28,8 +20,7 @@ types you want.
 | A single document type | `[vellum] Exhibits for M12205` |
 | Multiple document types | `[vellum] Exhibits and Transcripts for M12205` |
 | Everything on a matter | `[vellum] all documents for M12205` |
-
-The body of the email is ignored.
+| Free-form | Subject: `[vellum] filing request` · Body: `Can you pull Exhibits and Key Documents for M12205?` |
 
 ### Document types
 
