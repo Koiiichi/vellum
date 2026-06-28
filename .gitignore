@@ -1,0 +1,12 @@
+.local.env
+.env
+credentials.json
+token.json
+
+PLAN.md
+RULES.md
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store

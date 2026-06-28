@@ -1,0 +1,162 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap');
+
+.vellum-lbl {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 10px;
+  fill: var(--text-muted, #999);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.vellum-wm {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-weight: 500;
+  fill: var(--text-primary, #111);
+  letter-spacing: 0.03em;
+}
+.vellum-wm-inv {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-weight: 500;
+  fill: #ffffff;
+  letter-spacing: 0.03em;
+}
+.vellum-note {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 11px;
+  fill: var(--text-secondary, #666);
+}
+.vellum-mono {
+  font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+  font-size: 13px;
+  fill: var(--text-primary, #111);
+}
+</style>
+
+<svg width="100%" viewBox="0 0 680 760" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>Vellum brand sheet v2 — Space Grotesk, refined mark</title>
+  <desc>Brand sheet for Vellum using Space Grotesk typeface and a document fold mark with softened page corners, shown across sizes, email headers, and color palette.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="30" class="vellum-lbl">Mark — Option A refined</text>
+
+  <rect x="40" y="42" width="600" height="186" rx="10" fill="var(--surface-2,#fff)" stroke="var(--border,#e0e0e0)" stroke-width="0.5"/>
+
+  <!-- PRIMARY LOCKUP — large -->
+  <!-- Document mark: page body with soft rx, fold triangle cut from corner -->
+  <g transform="translate(112, 72)">
+    <!-- page body -->
+    <path d="M0,4 Q0,0 4,0 L26,0 L40,14 L40,52 Q40,56 36,56 L4,56 Q0,56 0,52 Z"
+          fill="none" stroke="#111" stroke-width="1.8" stroke-linejoin="round"/>
+    <!-- fold flap — filled dark -->
+    <path d="M26,0 L40,14 L26,14 Z" fill="#111" stroke="none"/>
+    <!-- fold crease line — white to separate flap from body -->
+    <path d="M26,0 L26,14 L40,14" fill="none" stroke="#fff" stroke-width="0.5"/>
+  </g>
+  <text x="168" y="107" text-anchor="start" font-size="30" class="vellum-wm">vellum</text>
+
+  <!-- SIZE SCALE ROW -->
+  <text x="72" y="152" class="vellum-note">48px</text>
+  <g transform="translate(72, 158)">
+    <path d="M0,3 Q0,0 3,0 L19,0 L28,10 L28,37 Q28,40 25,40 L3,40 Q0,40 0,37 Z"
+          fill="none" stroke="#111" stroke-width="1.5"/>
+    <path d="M19,0 L28,10 L19,10 Z" fill="#111" stroke="none"/>
+  </g>
+
+  <text x="136" y="152" class="vellum-note">32px</text>
+  <g transform="translate(136, 160)">
+    <path d="M0,2.5 Q0,0 2.5,0 L14,0 L21,7 L21,28 Q21,30 18.5,30 L2.5,30 Q0,30 0,27.5 Z"
+          fill="none" stroke="#111" stroke-width="1.4"/>
+    <path d="M14,0 L21,7 L14,7 Z" fill="#111" stroke="none"/>
+  </g>
+
+  <text x="194" y="152" class="vellum-note">24px</text>
+  <g transform="translate(194, 162)">
+    <path d="M0,2 Q0,0 2,0 L11,0 L17,6 L17,22 Q17,24 15,24 L2,24 Q0,24 0,22 Z"
+          fill="none" stroke="#111" stroke-width="1.2"/>
+    <path d="M11,0 L17,6 L11,6 Z" fill="#111" stroke="none"/>
+  </g>
+
+  <text x="244" y="152" class="vellum-note">16px</text>
+  <g transform="translate(244, 165)">
+    <path d="M0,1.5 Q0,0 1.5,0 L8,0 L12,4 L12,15 Q12,16.5 10.5,16.5 L1.5,16.5 Q0,16.5 0,15 Z"
+          fill="none" stroke="#111" stroke-width="1"/>
+    <path d="M8,0 L12,4 L8,4 Z" fill="#111" stroke="none"/>
+  </g>
+
+  <!-- mark-only column -->
+  <text x="320" y="152" class="vellum-note">mark only</text>
+  <g transform="translate(320, 156)">
+    <path d="M0,3 Q0,0 3,0 L19,0 L28,10 L28,37 Q28,40 25,40 L3,40 Q0,40 0,37 Z"
+          fill="none" stroke="#111" stroke-width="1.5"/>
+    <path d="M19,0 L28,10 L19,10 Z" fill="#111" stroke="none"/>
+  </g>
+
+  <!-- filled/inverted mark variant -->
+  <text x="400" y="152" class="vellum-note">filled variant</text>
+  <g transform="translate(400, 156)">
+    <path d="M0,3 Q0,0 3,0 L19,0 L28,10 L28,37 Q28,40 25,40 L3,40 Q0,40 0,37 Z"
+          fill="#111" stroke="none"/>
+    <path d="M19,0 L28,10 L19,10 Z" fill="#fff" opacity="0.15" stroke="none"/>
+    <path d="M19,0 L28,10 L19,10 L19,0 Z" fill="none" stroke="#fff" stroke-width="0.8" opacity="0.4"/>
+  </g>
+
+  <!-- EMAIL HEADER LIGHT -->
+  <text x="40" y="256" class="vellum-lbl">Email header — light</text>
+  <rect x="40" y="268" width="600" height="74" rx="8" fill="#ffffff" stroke="var(--border,#e0e0e0)" stroke-width="0.5"/>
+  <g transform="translate(64,284)">
+    <path d="M0,2.5 Q0,0 2.5,0 L16,0 L24,8 L24,34 Q24,36.5 21.5,36.5 L2.5,36.5 Q0,36.5 0,34 Z"
+          fill="none" stroke="#111" stroke-width="1.5"/>
+    <path d="M16,0 L24,8 L16,8 Z" fill="#111" stroke="none"/>
+  </g>
+  <text x="100" y="308" text-anchor="start" font-size="20" class="vellum-wm">vellum</text>
+  <line x1="40" y1="342" x2="640" y2="342" stroke="#e8e5df" stroke-width="1" fill="none"/>
+
+  <!-- EMAIL HEADER DARK -->
+  <text x="40" y="368" class="vellum-lbl">Email header — dark</text>
+  <rect x="40" y="380" width="600" height="74" rx="8" fill="#111111" stroke="#2a2a2a" stroke-width="0.5"/>
+  <g transform="translate(64,396)">
+    <path d="M0,2.5 Q0,0 2.5,0 L16,0 L24,8 L24,34 Q24,36.5 21.5,36.5 L2.5,36.5 Q0,36.5 0,34 Z"
+          fill="none" stroke="#ffffff" stroke-width="1.5"/>
+    <path d="M16,0 L24,8 L16,8 Z" fill="#ffffff" stroke="none"/>
+  </g>
+  <text x="100" y="424" text-anchor="start" font-size="20" class="vellum-wm-inv">vellum</text>
+  <line x1="40" y1="454" x2="640" y2="454" stroke="#2a2a2a" stroke-width="1" fill="none"/>
+
+  <!-- PALETTE -->
+  <text x="40" y="484" class="vellum-lbl">Palette</text>
+
+  <rect x="40" y="496" width="80" height="38" rx="6" fill="#111111"/>
+  <text x="80" y="521" text-anchor="middle" font-size="10" fill="#fff" font-family="'Space Grotesk',system-ui,sans-serif" letter-spacing="0.05em">#111111</text>
+
+  <rect x="132" y="496" width="80" height="38" rx="6" fill="#ffffff" stroke="#e0e0e0" stroke-width="0.5"/>
+  <text x="172" y="521" text-anchor="middle" font-size="10" fill="#111" font-family="'Space Grotesk',system-ui,sans-serif" letter-spacing="0.05em">#ffffff</text>
+
+  <rect x="224" y="496" width="80" height="38" rx="6" fill="#e8e5df"/>
+  <text x="264" y="521" text-anchor="middle" font-size="10" fill="#5f5e5a" font-family="'Space Grotesk',system-ui,sans-serif" letter-spacing="0.05em">#e8e5df</text>
+
+  <rect x="316" y="496" width="80" height="38" rx="6" fill="#6b7280"/>
+  <text x="356" y="521" text-anchor="middle" font-size="10" fill="#fff" font-family="'Space Grotesk',system-ui,sans-serif" letter-spacing="0.05em">#6b7280</text>
+
+  <!-- TYPEFACE SPECIMENS -->
+  <text x="40" y="566" class="vellum-lbl">Typeface — Space Grotesk 500</text>
+
+  <text x="40" y="604" font-family="'Space Grotesk',system-ui,sans-serif" font-weight="500" font-size="38" fill="var(--text-primary,#111)" letter-spacing="0.03em">vellum</text>
+  <text x="330" y="597" font-family="'Space Grotesk',system-ui,sans-serif" font-size="10" fill="var(--text-muted,#999)" letter-spacing="0.1em" text-transform="uppercase">38px · display</text>
+
+  <text x="40" y="636" font-family="'Space Grotesk',system-ui,sans-serif" font-weight="500" font-size="22" fill="var(--text-primary,#111)" letter-spacing="0.03em">vellum</text>
+  <text x="200" y="636" font-family="'Space Grotesk',system-ui,sans-serif" font-size="10" fill="var(--text-muted,#999)" letter-spacing="0.1em">22px · header</text>
+
+  <text x="40" y="658" font-family="'Space Grotesk',system-ui,sans-serif" font-weight="500" font-size="14" fill="var(--text-primary,#111)" letter-spacing="0.03em">vellum</text>
+  <text x="140" y="658" font-family="'Space Grotesk',system-ui,sans-serif" font-size="10" fill="var(--text-muted,#999)" letter-spacing="0.1em">14px · small</text>
+
+  <!-- NAMING CONVENTIONS -->
+  <text x="40" y="690" class="vellum-lbl">Naming conventions</text>
+  <text x="40" y="712" class="vellum-mono">vellum_M12205_OtherDocuments_2026-06-26.zip</text>
+  <text x="40" y="735" font-family="'Space Grotesk',system-ui,sans-serif" font-size="13" fill="var(--text-primary,#111)">[Vellum] M12205 · 10 Other Documents</text>
+</svg>

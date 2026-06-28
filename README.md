@@ -1,0 +1,168 @@
+# vellum
+
+<p align="center">
+  <img src="assets/vellum_readme_header.svg" width="200" alt="vellum" />
+</p>
+
+An async, event-driven agent that monitors a Gmail inbox, scrapes regulatory
+filings from the Nova Scotia UARB portal, and replies with a ZIP of the
+documents and a structured metadata summary.
+
+## Using Vellum
+
+Vellum is already running. Send an email to **vellum.agent@gmail.com** with a
+subject line that includes `[vellum]`, the matter number, and the document
+types you want.
+
+### Subject line format
+
+```
+[vellum] <document types> for <matter number>
+```
+
+### Examples
+
+| What you want | Subject line |
+|---|---|
+| A single document type | `[vellum] Exhibits for M12205` |
+| Multiple document types | `[vellum] Exhibits and Transcripts for M12205` |
+| Everything on a matter | `[vellum] all documents for M12205` |
+
+The body of the email is ignored.
+
+### Document types
+
+- Exhibits
+- Key Documents
+- Other Documents
+- Transcripts
+- Recordings
+
+### What you get back
+
+A reply within a few minutes containing a ZIP archive named
+`vellum_<matter>_<types>_<date>.zip`, with one subfolder per requested document
+type (up to 10 files each) and a `job_summary.json` with structured matter
+metadata: title, status, category, dates, tab counts, and a file manifest.
+
+If a requested tab has no documents, or the matter number is not found, you get
+an error reply explaining what was attempted.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    G[Gmail Inbox] -->|Push notification| P[Pub/Sub]
+    P -->|webhook| W[FastAPI /gmail/webhook]
+    W -->|ParsedRequest| Q[asyncio.Queue]
+    Q --> WK[Worker pool N=2]
+    WK --> S[scraper - Playwright]
+    S --> PK[packager - ZIP + job_summary.json]
+    PK --> SM[summarizer - HTML body]
+    SM --> M[mailer - SMTP reply + attachment]
+    M --> G
+```
+
+The webhook acknowledges Pub/Sub immediately and puts the job onto an
+`asyncio.Queue`. A pool of worker coroutines runs the scrape-package-render-reply
+pipeline, bounding concurrent Playwright sessions to avoid hammering the UARB site.
+
+## Self-Hosting
+
+1. Clone the repository and install dependencies:
+   ```bash
+   uv sync
+   uv run playwright install chromium
+   ```
+2. Create a Google Cloud project with the Gmail API, Pub/Sub API, Cloud Run
+   API, and Secret Manager API enabled. Create a Pub/Sub topic and a push
+   subscription pointed at `/gmail/webhook`. Grant
+   `gmail-api-push@system.gserviceaccount.com` the `roles/pubsub.publisher`
+   role on the topic.
+3. Create OAuth2 Desktop credentials, download them as `credentials.json`, and
+   run the authorization flow once:
+   ```bash
+   uv run python scripts/authorize.py
+   ```
+4. Copy `.env.example` to `.local.env` and fill in your values.
+5. Deploy to Cloud Run:
+   ```bash
+   bash scripts/deploy.sh
+   ```
+   The script builds the image, pushes it to Artifact Registry, stores
+   `credentials.json` and `token.json` in Secret Manager, deploys the service,
+   and updates the Pub/Sub subscription endpoint.
+
+## Environment Variables
+
+| Variable | Description |
+|---|---|
+| `GMAIL_ADDRESS` | The mailbox Vellum watches and replies from. |
+| `GMAIL_CREDENTIALS_PATH` | Path to the OAuth2 client credentials JSON. |
+| `GMAIL_TOKEN_PATH` | Path to the cached OAuth token (default `token.json`). |
+| `PUBSUB_TOPIC` | Fully qualified Pub/Sub topic for Gmail push. |
+| `PUBSUB_SUBSCRIPTION` | Fully qualified Pub/Sub push subscription. |
+| `OPENAI_API_KEY` | OpenAI API key used by the email parser. |
+| `OPENAI_MODEL` | Parser model (default `gpt-5.4-mini`). |
+| `MAX_CONCURRENT_WORKERS` | Worker coroutines / max concurrent browsers (default 2). |
+| `MAX_DOCUMENTS` | Maximum documents downloaded per tab (default 10). |
+| `DOWNLOAD_TIMEOUT_MS` | Per-download timeout in milliseconds (default 30000). |
+| `SCRAPER_RETRY_ATTEMPTS` | Download retry attempts (default 3). |
+| `SCRAPER_RETRY_BACKOFF_S` | Backoff between retries in seconds (default 2). |
+| `PARSER_MAX_CALLS_PER_MINUTE` | Rate limit for parser LLM calls (default 20). |
+| `UARB_BASE_URL` | UARB portal entry URL. |
+| `SELECTOR_TIMEOUT_MS` | Explicit wait timeout for selectors (default 15000). |
+| `SCRAPER_HEADLESS` | Run Chromium headless (default true). |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP server for outbound replies. |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | SMTP credentials. |
+| `SMTP_USE_TLS` | Use STARTTLS (default true). |
+| `EMAIL_FROM` / `EMAIL_FROM_NAME` | Reply sender address and display name. |
+| `HOST` / `PORT` | FastAPI bind address (default 0.0.0.0:8000). |
+
+## How It Works
+
+1. **Listener** (`agent/listener.py`) receives the Pub/Sub push, decodes the
+   `historyId`, fetches new messages via the Gmail API, and extracts the sender,
+   subject, and body.
+2. **Parser** (`agent/parser.py`) ignores emails without the `[vellum]` subject
+   tag, then uses a single LLM call to extract the matter number and document
+   types. A sliding-window rate limiter caps API usage.
+3. **Scraper** (`agent/scraper.py`) drives Chromium against the FileMaker
+   WebDirect portal: searches the matter, extracts header metadata, parses tab
+   counts, scrolls paginated lists, and intercepts each download. Empty tabs are
+   non-fatal.
+4. **Packager** (`agent/packager.py`) builds the ZIP with one subfolder per
+   type and writes `job_summary.json`.
+5. **Summarizer** (`agent/summarizer.py`) renders the HTML email body and
+   subject line from the matter metadata.
+6. **Mailer** (`agent/mailer.py`) sends the reply with the ZIP attached.
+
+## Development
+
+Run the test suite:
+
+```bash
+uv run pytest
+```
+
+Run the live scraper integration test against the UARB site:
+
+```bash
+VELLUM_LIVE_TESTS=1 uv run pytest tests/test_scraper.py
+```
+
+Exercise the full pipeline without sending email:
+
+```bash
+uv run python main.py --dry-run --matter M12205 --types "Exhibits,Transcripts"
+uv run python main.py --dry-run --matter M12205 --types all
+```
+
+## What I'd Add Next
+
+- Vector database ingestion after download, feeding `job_summary.json` and the
+  raw documents into a searchable regulatory index.
+- Multi-mailbox support.
+- A dead-letter queue for failed jobs with automatic replay.

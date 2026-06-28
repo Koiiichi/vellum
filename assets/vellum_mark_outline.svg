@@ -1,0 +1,16 @@
+<svg width="48" height="58" viewBox="0 0 48 58" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Vellum mark — outline</title>
+  <desc>Document fold mark for Vellum, outline variant</desc>
+  <!--
+    Single compound path: page body with fold cut out of the top-right corner.
+    The path traces the full page outline including the fold notch,
+    so there is no overlap between the triangle and the page body — clean at any scale.
+    Fill = white (page), stroke = black (outline).
+    Fold triangle is a separate filled shape sitting behind the stroke.
+  -->
+  <!-- page body: all corners rounded except top-right (fold replaces it) -->
+  <path d="M5,0 L31,0 L48,17 L48,53 Q48,58 43,58 L5,58 Q0,58 0,53 L0,5 Q0,0 5,0 Z"
+        fill="#ffffff" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- fold triangle: sits on top, flush with the page body top-right corner -->
+  <polygon points="31,0 48,17 31,17" fill="#111111"/>
+</svg>

@@ -1,0 +1,16 @@
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.DS_Store
+
+.local.env
+.env
+credentials.json
+token.json
+
+tests/
+assets/
+PLAN.md
+RULES.md
+*.md

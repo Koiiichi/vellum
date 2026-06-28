@@ -1,0 +1,14 @@
+<svg width="240" height="70" viewBox="0 0 240 70" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Vellum</title>
+  <desc>Vellum README header — centered wordmark for GitHub markdown</desc>
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500&amp;display=swap');</style>
+  </defs>
+  <!-- mark scaled to ~58px tall, centered in lockup -->
+  <path d="M5,0 L31,0 L48,17 L48,53 Q48,58 43,58 L5,58 Q0,58 0,53 L0,5 Q0,0 5,0 Z"
+        fill="#ffffff" stroke="#111111" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+  <polygon points="31,0 48,17 31,17" fill="#111111"/>
+  <text x="62" y="43"
+        font-family="'Space Grotesk', system-ui, -apple-system, sans-serif"
+        font-weight="500" font-size="36" letter-spacing="0.03em" fill="#111111">vellum</text>
+</svg>

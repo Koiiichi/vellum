@@ -1,0 +1,8 @@
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Vellum</title>
+  <desc>Vellum favicon — 16px, simplified for small size rendering</desc>
+  <!-- at 16px: filled solid shape, fold triangle as white notch -->
+  <path d="M1.5,0 L8.5,0 L13,4.5 L13,14.5 Q13,16 11.5,16 L1.5,16 Q0,16 0,14.5 L0,1.5 Q0,0 1.5,0 Z"
+        fill="#111111"/>
+  <polygon points="8.5,0 13,4.5 8.5,4.5" fill="#ffffff" opacity="0.9"/>
+</svg>
