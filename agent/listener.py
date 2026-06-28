@@ -11,11 +11,13 @@ worker pool processes the job out of band.
 import asyncio
 import base64
 import json
+from email.utils import parseaddr
 
 from fastapi import FastAPI, Request
 
 from agent import parser
 from agent.gmail_watch import get_gmail_service
+from core import config
 from core.logger import get_logger, new_request_id
 from core.models import ParsedRequest
 
@@ -43,6 +45,23 @@ def _header(payload: dict, name: str) -> str:
         if header.get("name", "").lower() == name.lower():
             return header.get("value", "")
     return ""
+
+
+def _normalise_email(value: str | None) -> str:
+    """Extract and lowercase an email address from a header value."""
+    _, address = parseaddr(value or "")
+    return address.strip().lower()
+
+
+def _is_self_sender(sender: str) -> bool:
+    """Return True when a message came from Vellum's own mailbox."""
+    sender = _normalise_email(sender)
+    own_addresses = {
+        _normalise_email(config.GMAIL_ADDRESS),
+        _normalise_email(config.EMAIL_FROM),
+    }
+    own_addresses.discard("")
+    return bool(sender and sender in own_addresses)
 
 
 def _extract_body(payload: dict) -> str:
@@ -88,7 +107,7 @@ def _get_message(service, message_id: str) -> dict:
 def _parse_message(raw: dict) -> tuple[str, str, str]:
     """Return (sender_email, subject, body) from a raw Gmail message."""
     payload = raw.get("payload", {})
-    sender = _header(payload, "From")
+    sender = _normalise_email(_header(payload, "From"))
     subject = _header(payload, "Subject")
     body = _extract_body(payload)
     return sender, subject, body
@@ -122,6 +141,12 @@ async def _handle_notification(notification: dict, queue: "asyncio.Queue[ParsedR
     for message_id in message_ids:
         raw = await asyncio.to_thread(_get_message, service, message_id)
         sender, subject, body = _parse_message(raw)
+        if _is_self_sender(sender):
+            logger.info(
+                "email ignored: sender is Vellum mailbox",
+                extra={"step": "listener.self_sender", "message_id": message_id},
+            )
+            continue
         request_id = new_request_id()
         try:
             parsed = await parser.parse(sender, subject, body, request_id)

@@ -1,86 +1,93 @@
-"""Tests for the SMTP mailer with the network mocked out.
+"""Tests for the Gmail API mailer with the network mocked out.
 
-A fake SMTP class records the message that would have been sent so message
-construction, TLS negotiation, authentication, and attachment handling can be
-verified without contacting a real server.
+A fake Gmail service records the raw MIME payload that would have been sent so
+message construction and attachment handling can be verified without contacting
+Google.
 """
+
+import base64
+from email import message_from_bytes
+from email.message import EmailMessage
+from email.policy import default
 
 import pytest
 
 from agent import mailer
 
 
-class _FakeSMTP:
-    instances: list["_FakeSMTP"] = []
-
-    def __init__(self, host, port, timeout=None):
-        self.host = host
-        self.port = port
-        self.tls = False
-        self.login_args = None
-        self.sent_message = None
-        _FakeSMTP.instances.append(self)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def ehlo(self):
-        pass
-
-    def starttls(self):
-        self.tls = True
-
-    def login(self, username, password):
-        self.login_args = (username, password)
-
-    def send_message(self, message):
-        self.sent_message = message
+class _FakeExecute:
+    def execute(self):
+        return {"id": "sent-message-id"}
 
 
-@pytest.fixture(autouse=True)
-def patch_smtp(monkeypatch):
-    _FakeSMTP.instances.clear()
-    monkeypatch.setattr(mailer.smtplib, "SMTP", _FakeSMTP)
-    monkeypatch.setattr(mailer.config, "SMTP_HOST", "smtp.example.com")
-    monkeypatch.setattr(mailer.config, "SMTP_PORT", 587)
-    monkeypatch.setattr(mailer.config, "SMTP_USERNAME", "user@example.com")
-    monkeypatch.setattr(mailer.config, "SMTP_PASSWORD", "secret")
-    monkeypatch.setattr(mailer.config, "SMTP_USE_TLS", True)
+class _FakeSend:
+    def __init__(self, service: "_FakeGmailService"):
+        self.service = service
+
+    def send(self, userId, body):
+        self.service.user_id = userId
+        self.service.body = body
+        return _FakeExecute()
+
+
+class _FakeMessages:
+    def __init__(self, service: "_FakeGmailService"):
+        self.service = service
+
+    def messages(self):
+        return _FakeSend(self.service)
+
+
+class _FakeGmailService:
+    def __init__(self):
+        self.user_id = None
+        self.body = None
+
+    def users(self):
+        return _FakeMessages(self)
+
+
+def _sent_message(service: _FakeGmailService) -> EmailMessage:
+    raw = service.body["raw"]
+    decoded = base64.urlsafe_b64decode(raw)
+    return message_from_bytes(decoded, policy=default)
+
+
+@pytest.fixture
+def fake_gmail(monkeypatch):
+    service = _FakeGmailService()
+
+    def get_service():
+        return service
+
+    monkeypatch.setattr(mailer, "get_gmail_service", get_service)
     monkeypatch.setattr(mailer.config, "EMAIL_FROM", "vellum@example.com")
     monkeypatch.setattr(mailer.config, "EMAIL_FROM_NAME", "Vellum")
+    return service
 
 
-async def test_send_plain_html():
+async def test_send_plain_html(fake_gmail):
     await mailer.send("dest@example.com", "[Vellum] M12205", "<p>hello</p>")
-    assert len(_FakeSMTP.instances) == 1
-    smtp = _FakeSMTP.instances[0]
-    assert smtp.tls is True
-    assert smtp.login_args == ("user@example.com", "secret")
-    message = smtp.sent_message
+
+    assert fake_gmail.user_id == "me"
+    message = _sent_message(fake_gmail)
     assert message["To"] == "dest@example.com"
     assert message["Subject"] == "[Vellum] M12205"
     assert "Vellum" in message["From"]
+    assert message["Auto-Submitted"] == "auto-generated"
+    assert message["X-Auto-Response-Suppress"] == "All"
+    assert message["Precedence"] == "bulk"
 
 
-async def test_send_with_attachment(tmp_path):
+async def test_send_with_attachment(fake_gmail, tmp_path):
     zip_path = tmp_path / "vellum_M12205_Exhibits_2026-06-26.zip"
     zip_path.write_bytes(b"PK\x03\x04 fake zip")
 
     await mailer.send("dest@example.com", "subject", "<p>body</p>", zip_path)
-    message = _FakeSMTP.instances[0].sent_message
+    message = _sent_message(fake_gmail)
 
     attachments = [
         part for part in message.iter_attachments()
         if part.get_filename() == zip_path.name
     ]
     assert len(attachments) == 1
-
-
-async def test_send_raises_without_credentials(monkeypatch):
-    monkeypatch.setattr(mailer.config, "SMTP_USERNAME", None)
-    monkeypatch.setattr(mailer.config, "SMTP_PASSWORD", None)
-    with pytest.raises(mailer.MailerError):
-        await mailer.send("dest@example.com", "subject", "<p>body</p>")

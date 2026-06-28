@@ -61,11 +61,6 @@ UARB_BASE_URL = _get_str("UARB_BASE_URL", "https://uarb.novascotia.ca/fmi/webd/U
 SELECTOR_TIMEOUT_MS = _get_int("SELECTOR_TIMEOUT_MS", 15000)
 SCRAPER_HEADLESS = _get_bool("SCRAPER_HEADLESS", True)
 
-SMTP_HOST = _get_str("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = _get_int("SMTP_PORT", 587)
-SMTP_USERNAME = _get_str("SMTP_USERNAME")
-SMTP_PASSWORD = _get_str("SMTP_PASSWORD")
-SMTP_USE_TLS = _get_bool("SMTP_USE_TLS", True)
 EMAIL_FROM = _get_str("EMAIL_FROM") or GMAIL_ADDRESS
 EMAIL_FROM_NAME = _get_str("EMAIL_FROM_NAME", "Vellum")
 

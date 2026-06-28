@@ -53,7 +53,7 @@ flowchart LR
     WK --> S[scraper - Playwright]
     S --> PK[packager - ZIP + job_summary.json]
     PK --> SM[summarizer - HTML body]
-    SM --> M[mailer - SMTP reply + attachment]
+    SM --> M[mailer - Gmail API reply + attachment]
     M --> G
 ```
 
@@ -74,10 +74,13 @@ pipeline, bounding concurrent Playwright sessions to avoid hammering the UARB si
    `gmail-api-push@system.gserviceaccount.com` the `roles/pubsub.publisher`
    role on the topic.
 3. Create OAuth2 Desktop credentials, download them as `credentials.json`, and
-   run the authorization flow once:
+   run the authorization flow once. The OAuth token needs both Gmail read/watch
+   access and Gmail send access:
    ```bash
    uv run python scripts/authorize.py
    ```
+   If you already have a `token.json` from an older Vellum setup, rerun this
+   step so the token includes `https://www.googleapis.com/auth/gmail.send`.
 4. Copy `.env.example` to `.local.env` and fill in your values.
 5. Deploy to Cloud Run:
    ```bash
@@ -107,9 +110,6 @@ pipeline, bounding concurrent Playwright sessions to avoid hammering the UARB si
 | `UARB_BASE_URL` | UARB portal entry URL. |
 | `SELECTOR_TIMEOUT_MS` | Explicit wait timeout for selectors (default 15000). |
 | `SCRAPER_HEADLESS` | Run Chromium headless (default true). |
-| `SMTP_HOST` / `SMTP_PORT` | SMTP server for outbound replies. |
-| `SMTP_USERNAME` / `SMTP_PASSWORD` | SMTP credentials. |
-| `SMTP_USE_TLS` | Use STARTTLS (default true). |
 | `EMAIL_FROM` / `EMAIL_FROM_NAME` | Reply sender address and display name. |
 | `HOST` / `PORT` | FastAPI bind address (default 0.0.0.0:8000). |
 
@@ -129,7 +129,8 @@ pipeline, bounding concurrent Playwright sessions to avoid hammering the UARB si
    type and writes `job_summary.json`.
 5. **Summarizer** (`agent/summarizer.py`) renders the HTML email body and
    subject line from the matter metadata.
-6. **Mailer** (`agent/mailer.py`) sends the reply with the ZIP attached.
+6. **Mailer** (`agent/mailer.py`) sends the reply with the ZIP attached through
+   the Gmail API.
 
 ## Development
 

@@ -84,12 +84,14 @@ def _tab_breakdown_rows(metadata: MatterMetadata) -> str:
         requested = doc_type in metadata.requested_types
         weight = "600" if requested else "400"
         color = "#111111" if requested else "#6b7280"
-        marker = " &middot; requested" if requested else ""
+        marker = " &nbsp;&middot;&nbsp; requested" if requested else ""
         rows.append(
-            f'<tr><td style="padding:5px 0; font-weight:{weight}; color:{color};">'
+            f'<tr>'
+            f'<td style="padding:5px 12px 5px 0; font-weight:{weight}; color:{color}; white-space:nowrap;">'
             f"{html.escape(doc_type)}{marker}</td>"
             f'<td style="padding:5px 0; text-align:right; font-weight:{weight}; '
-            f'color:{color};">{count}</td></tr>'
+            f'color:{color}; white-space:nowrap; width:32px;">{count}</td>'
+            f'</tr>'
         )
     return "\n".join(rows)
 
@@ -249,7 +251,8 @@ def _logo_html() -> str:
         safe = html.escape(url, quote=True)
         return (
             f'<img id="vellum-logo" src="{safe}" width="160" height="46" alt="Vellum" '
-            'style="display:block; border:0; outline:none; text-decoration:none;">'
+            'style="display:block; border:0; outline:none; text-decoration:none; '
+            'width:160px; max-width:100%; height:auto;">'
         )
     return (
         '<span style="font-size:25px; font-weight:500; letter-spacing:0.03em; '
