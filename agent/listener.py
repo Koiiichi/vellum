@@ -123,7 +123,14 @@ async def _handle_notification(notification: dict, queue: "asyncio.Queue[ParsedR
         raw = await asyncio.to_thread(_get_message, service, message_id)
         sender, subject, body = _parse_message(raw)
         request_id = new_request_id()
-        parsed = await parser.parse(sender, subject, body, request_id)
+        try:
+            parsed = await parser.parse(sender, subject, body, request_id)
+        except parser.RateLimitExceeded:
+            logger.warning(
+                "parser rate limit exceeded, dropping message",
+                extra={"step": "listener.rate_limit", "message_id": message_id},
+            )
+            continue
         if parsed is not None:
             await queue.put(parsed)
             logger.info(
