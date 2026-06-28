@@ -11,7 +11,7 @@ documents and a structured metadata summary.
 
 ## Using Vellum
 
-Vellum is already running. Send an email to **vellum.agent@gmail.com** with `[vellum]` anywhere in the subject line. The rest is free-form — put the matter number and document types in the subject or the body, however is natural.
+Vellum is already running. Send an email to **vellumtheagent@gmail.com** with `[vellum]` anywhere in the subject line. The rest is free-form — put the matter number and document types in the subject or the body, however is natural.
 
 ### Examples
 
