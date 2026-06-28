@@ -11,12 +11,24 @@ from email.message import EmailMessage
 from email.policy import default
 
 import pytest
+from googleapiclient.errors import HttpError
 
 from agent import mailer
 
 
+class _FakeResp(dict):
+    status = 429
+    reason = "Too Many Requests"
+
+
 class _FakeExecute:
+    def __init__(self, service: "_FakeGmailService"):
+        self.service = service
+
     def execute(self):
+        self.service.attempts += 1
+        if self.service.failures:
+            raise self.service.failures.pop(0)
         return {"id": "sent-message-id"}
 
 
@@ -27,7 +39,7 @@ class _FakeSend:
     def send(self, userId, body):
         self.service.user_id = userId
         self.service.body = body
-        return _FakeExecute()
+        return _FakeExecute(self.service)
 
 
 class _FakeMessages:
@@ -42,6 +54,8 @@ class _FakeGmailService:
     def __init__(self):
         self.user_id = None
         self.body = None
+        self.attempts = 0
+        self.failures = []
 
     def users(self):
         return _FakeMessages(self)
@@ -91,3 +105,31 @@ async def test_send_with_attachment(fake_gmail, tmp_path):
         if part.get_filename() == zip_path.name
     ]
     assert len(attachments) == 1
+
+
+async def test_send_retries_gmail_rate_limit(monkeypatch, fake_gmail):
+    monkeypatch.setattr(mailer.config, "MAILER_SEND_RETRY_ATTEMPTS", 2)
+    monkeypatch.setattr(mailer.config, "MAILER_MAX_RETRY_DELAY_S", 0)
+    fake_gmail.failures.append(
+        HttpError(
+            _FakeResp(),
+            b'{"error": {"message": "User-rate limit exceeded.  Retry after 2026-06-28T11:23:56.587Z (Mail sending)", "reason": "rateLimitExceeded"}}',
+        )
+    )
+
+    await mailer.send("dest@example.com", "subject", "<p>body</p>")
+
+    assert fake_gmail.attempts == 2
+
+
+async def test_send_raises_after_gmail_rate_limit_retries(monkeypatch, fake_gmail):
+    monkeypatch.setattr(mailer.config, "MAILER_SEND_RETRY_ATTEMPTS", 1)
+    fake_gmail.failures.append(
+        HttpError(
+            _FakeResp(),
+            b'{"error": {"message": "User-rate limit exceeded", "reason": "rateLimitExceeded"}}',
+        )
+    )
+
+    with pytest.raises(mailer.MailerRateLimitExceeded):
+        await mailer.send("dest@example.com", "subject", "<p>body</p>")

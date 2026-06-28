@@ -111,6 +111,9 @@ pipeline, bounding concurrent Playwright sessions to avoid hammering the UARB si
 | `SELECTOR_TIMEOUT_MS` | Explicit wait timeout for selectors (default 15000). |
 | `SCRAPER_HEADLESS` | Run Chromium headless (default true). |
 | `EMAIL_FROM` / `EMAIL_FROM_NAME` | Reply sender address and display name. |
+| `MAILER_SEND_RETRY_ATTEMPTS` | Gmail send attempts before surfacing delivery failure (default 3). |
+| `MAILER_RETRY_BASE_DELAY_S` | Base backoff for retryable mailer errors without provider retry hints (default 2). |
+| `MAILER_MAX_RETRY_DELAY_S` | Maximum delay between Gmail send retries in seconds (default 900). |
 | `HOST` / `PORT` | FastAPI bind address (default 0.0.0.0:8000). |
 
 ## How It Works
