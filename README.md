@@ -1,5 +1,3 @@
-# vellum
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/vellum_readme_header_dark.svg">
