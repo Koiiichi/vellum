@@ -1,36 +1,27 @@
-"""Gmail API delivery of branded HTML replies with optional ZIP attachment.
+"""Resend delivery of branded HTML replies.
 
 The mailer is intentionally thin: it builds a multipart HTML message, attaches
-the archive when present, and sends it through the authenticated Gmail API. The
-blocking Google API call is offloaded to a worker thread so it can be awaited
-from the asyncio worker pool without stalling the event loop.
+the archive when present, and sends it through Resend's Python SDK. The blocking
+network call is offloaded to a worker thread so it can be awaited from the
+asyncio worker pool without stalling the event loop.
 """
 
 import asyncio
-import base64
 import mimetypes
-import re
-from datetime import UTC, datetime
 from email.message import EmailMessage
 from email.utils import formataddr
 from pathlib import Path
 
-from googleapiclient.errors import HttpError
+import resend
 
-from agent.gmail_watch import get_gmail_service
 from core import config
 from core.logger import get_logger
 
 logger = get_logger(__name__)
-_RETRY_AFTER_PATTERN = re.compile(r"Retry after ([0-9T:.-]+Z)")
 
 
 class MailerError(Exception):
     """Raised when an email cannot be constructed or delivered."""
-
-
-class MailerRateLimitExceeded(MailerError):
-    """Raised when Gmail keeps rejecting delivery after retry attempts."""
 
 
 def _build_message(to_email: str, subject: str, html_body: str, attachment: Path | None) -> EmailMessage:
@@ -61,72 +52,63 @@ def _build_message(to_email: str, subject: str, html_body: str, attachment: Path
     return message
 
 
+def _extract_html_body(message: EmailMessage) -> str:
+    """Extract the HTML alternative from a MIME message."""
+    html_part = message.get_body(preferencelist=("html",))
+    if html_part is not None:
+        return html_part.get_content()
+
+    if message.get_content_type() == "text/html":
+        return message.get_content()
+
+    plain_part = message.get_body(preferencelist=("plain",))
+    if plain_part is not None:
+        return plain_part.get_content()
+
+    return ""
+
+
 def _send_sync(message: EmailMessage) -> None:
-    """Send a prepared message through the authenticated Gmail API."""
-    raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
-    service = get_gmail_service()
-    service.users().messages().send(userId="me", body={"raw": raw}).execute()
+    """Send a prepared message through Resend's Python SDK."""
+    api_key = config.RESEND_API_KEY
+    from_email = config.EMAIL_FROM
+    if not api_key:
+        raise MailerError("RESEND_API_KEY is not configured")
+    if not from_email:
+        raise MailerError("EMAIL_FROM is not configured")
 
+    payload = {
+        "from": from_email,
+        "to": [message["To"]],
+        "subject": message["Subject"],
+        "html": _extract_html_body(message),
+    }
 
-def _retry_after_delay(error: HttpError, now: datetime | None = None) -> float | None:
-    """Return Gmail's requested retry delay in seconds when present."""
-    retry_after = getattr(error.resp, "get", lambda _name: None)("retry-after")
-    if retry_after:
-        try:
-            return max(0.0, float(retry_after))
-        except ValueError:
-            pass
-
-    content = error.content.decode("utf-8", "replace") if isinstance(error.content, bytes) else str(error.content)
-    match = _RETRY_AFTER_PATTERN.search(content)
-    if not match:
-        return None
-
-    retry_at = datetime.fromisoformat(match.group(1).replace("Z", "+00:00"))
-    now = now or datetime.now(UTC)
-    return max(0.0, (retry_at - now).total_seconds())
-
-
-def _is_rate_limit_error(error: HttpError) -> bool:
-    """Return True when Gmail rejected the send because of rate limiting."""
-    status = getattr(error.resp, "status", None)
-    if status == 429:
-        return True
-    content = error.content.decode("utf-8", "replace") if isinstance(error.content, bytes) else str(error.content)
-    return "rateLimitExceeded" in content or "User-rate limit exceeded" in content
+    try:
+        if hasattr(resend, "Resend"):
+            client = resend.Resend(api_key=api_key)
+            client.emails.send(payload)
+        else:
+            resend.api_key = api_key
+            resend.Emails.send(payload)
+    except Exception as exc:
+        logger.error(
+            "resend delivery failed",
+            extra={
+                "step": "mailer.resend",
+                "error_type": type(exc).__name__,
+                "reason": str(exc),
+                "to": message["To"],
+                "subject": message["Subject"],
+            },
+        )
+        raise MailerError(f"Resend delivery failed: {exc}") from exc
 
 
 async def send(to_email: str, subject: str, html_body: str, attachment: Path | None = None) -> None:
-    """Send a branded HTML email, offloading the blocking SMTP call to a thread."""
+    """Send a branded HTML email through Resend."""
     message = _build_message(to_email, subject, html_body, attachment)
-    attempts = max(1, config.MAILER_SEND_RETRY_ATTEMPTS)
-    for attempt in range(1, attempts + 1):
-        try:
-            await asyncio.to_thread(_send_sync, message)
-            break
-        except HttpError as exc:
-            if not _is_rate_limit_error(exc) or attempt >= attempts:
-                if _is_rate_limit_error(exc):
-                    raise MailerRateLimitExceeded(str(exc)) from exc
-                raise
-
-            provider_delay = _retry_after_delay(exc)
-            fallback_delay = config.MAILER_RETRY_BASE_DELAY_S * (2 ** (attempt - 1))
-            delay = provider_delay if provider_delay is not None else fallback_delay
-            delay = min(delay, config.MAILER_MAX_RETRY_DELAY_S)
-            logger.warning(
-                "gmail send rate limited, retrying",
-                extra={
-                    "step": "mailer.rate_limit",
-                    "to": to_email,
-                    "subject": subject,
-                    "attempt": attempt,
-                    "max_attempts": attempts,
-                    "retry_delay_s": round(delay, 3),
-                },
-            )
-            await asyncio.sleep(delay)
-
+    await asyncio.to_thread(_send_sync, message)
     logger.info(
         "email sent",
         extra={"step": "mailer.send", "to": to_email, "subject": subject},

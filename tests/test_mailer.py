@@ -1,135 +1,113 @@
-"""Tests for the Gmail API mailer with the network mocked out.
+"""Tests for the Resend SDK mailer with the network mocked out."""
 
-A fake Gmail service records the raw MIME payload that would have been sent so
-message construction and attachment handling can be verified without contacting
-Google.
-"""
-
-import base64
-from email import message_from_bytes
 from email.message import EmailMessage
-from email.policy import default
 
 import pytest
-from googleapiclient.errors import HttpError
 
 from agent import mailer
 
 
-class _FakeResp(dict):
-    status = 429
-    reason = "Too Many Requests"
+class _FakeEmails:
+    sent_payloads = []
 
-
-class _FakeExecute:
-    def __init__(self, service: "_FakeGmailService"):
-        self.service = service
-
-    def execute(self):
-        self.service.attempts += 1
-        if self.service.failures:
-            raise self.service.failures.pop(0)
-        return {"id": "sent-message-id"}
-
-
-class _FakeSend:
-    def __init__(self, service: "_FakeGmailService"):
-        self.service = service
-
-    def send(self, userId, body):
-        self.service.user_id = userId
-        self.service.body = body
-        return _FakeExecute(self.service)
-
-
-class _FakeMessages:
-    def __init__(self, service: "_FakeGmailService"):
-        self.service = service
-
-    def messages(self):
-        return _FakeSend(self.service)
-
-
-class _FakeGmailService:
-    def __init__(self):
-        self.user_id = None
-        self.body = None
-        self.attempts = 0
-        self.failures = []
-
-    def users(self):
-        return _FakeMessages(self)
-
-
-def _sent_message(service: _FakeGmailService) -> EmailMessage:
-    raw = service.body["raw"]
-    decoded = base64.urlsafe_b64decode(raw)
-    return message_from_bytes(decoded, policy=default)
+    @classmethod
+    def send(cls, payload):
+        cls.sent_payloads.append(payload)
+        return {"id": "email-id"}
 
 
 @pytest.fixture
-def fake_gmail(monkeypatch):
-    service = _FakeGmailService()
-
-    def get_service():
-        return service
-
-    monkeypatch.setattr(mailer, "get_gmail_service", get_service)
-    monkeypatch.setattr(mailer.config, "EMAIL_FROM", "vellum@example.com")
+def fake_resend(monkeypatch):
+    _FakeEmails.sent_payloads = []
+    monkeypatch.delattr(mailer.resend, "Resend", raising=False)
+    monkeypatch.setattr(mailer.resend, "Emails", _FakeEmails)
+    monkeypatch.setattr(mailer.config, "RESEND_API_KEY", "re_test")
+    monkeypatch.setattr(mailer.config, "EMAIL_FROM", "Vellum <vellum@example.com>")
     monkeypatch.setattr(mailer.config, "EMAIL_FROM_NAME", "Vellum")
-    return service
+    return _FakeEmails.sent_payloads
 
 
-async def test_send_plain_html(fake_gmail):
+async def test_send_plain_html(fake_resend):
     await mailer.send("dest@example.com", "[Vellum] M12205", "<p>hello</p>")
 
-    assert fake_gmail.user_id == "me"
-    message = _sent_message(fake_gmail)
-    assert message["To"] == "dest@example.com"
-    assert message["Subject"] == "[Vellum] M12205"
-    assert "Vellum" in message["From"]
-    assert message["Auto-Submitted"] == "auto-generated"
-    assert message["X-Auto-Response-Suppress"] == "All"
-    assert message["Precedence"] == "bulk"
+    assert fake_resend == [
+        {
+            "from": "Vellum <vellum@example.com>",
+            "to": ["dest@example.com"],
+            "subject": "[Vellum] M12205",
+            "html": "<p>hello</p>\n",
+        }
+    ]
 
 
-async def test_send_with_attachment(fake_gmail, tmp_path):
+async def test_send_with_attachment_posts_resend_payload(fake_resend, tmp_path):
     zip_path = tmp_path / "vellum_M12205_Exhibits_2026-06-26.zip"
     zip_path.write_bytes(b"PK\x03\x04 fake zip")
 
     await mailer.send("dest@example.com", "subject", "<p>body</p>", zip_path)
-    message = _sent_message(fake_gmail)
 
-    attachments = [
-        part for part in message.iter_attachments()
-        if part.get_filename() == zip_path.name
-    ]
-    assert len(attachments) == 1
+    assert fake_resend[0]["to"] == ["dest@example.com"]
+    assert fake_resend[0]["subject"] == "subject"
+    assert fake_resend[0]["html"] == "<p>body</p>\n"
 
 
-async def test_send_retries_gmail_rate_limit(monkeypatch, fake_gmail):
-    monkeypatch.setattr(mailer.config, "MAILER_SEND_RETRY_ATTEMPTS", 2)
-    monkeypatch.setattr(mailer.config, "MAILER_MAX_RETRY_DELAY_S", 0)
-    fake_gmail.failures.append(
-        HttpError(
-            _FakeResp(),
-            b'{"error": {"message": "User-rate limit exceeded.  Retry after 2026-06-28T11:23:56.587Z (Mail sending)", "reason": "rateLimitExceeded"}}',
-        )
-    )
+def test_extract_html_body_prefers_html_alternative():
+    message = EmailMessage()
+    message.set_content("plain body")
+    message.add_alternative("<p>html body</p>", subtype="html")
+
+    assert mailer._extract_html_body(message) == "<p>html body</p>\n"
+
+
+async def test_send_requires_resend_api_key(monkeypatch):
+    monkeypatch.setattr(mailer.config, "RESEND_API_KEY", None)
+    monkeypatch.setattr(mailer.config, "EMAIL_FROM", "Vellum <vellum@example.com>")
+
+    with pytest.raises(mailer.MailerError, match="RESEND_API_KEY"):
+        await mailer.send("dest@example.com", "subject", "<p>body</p>")
+
+
+async def test_send_wraps_resend_sdk_error(monkeypatch):
+    class FailingEmails:
+        @classmethod
+        def send(cls, payload):
+            raise RuntimeError("invalid from")
+
+    monkeypatch.delattr(mailer.resend, "Resend", raising=False)
+    monkeypatch.setattr(mailer.resend, "Emails", FailingEmails)
+    monkeypatch.setattr(mailer.config, "RESEND_API_KEY", "re_test")
+    monkeypatch.setattr(mailer.config, "EMAIL_FROM", "Vellum <vellum@example.com>")
+
+    with pytest.raises(mailer.MailerError, match="invalid from"):
+        await mailer.send("dest@example.com", "subject", "<p>body</p>")
+
+
+async def test_send_supports_resend_client_shape(monkeypatch):
+    sent_payloads = []
+
+    class FakeClient:
+        def __init__(self, api_key):
+            self.api_key = api_key
+            self.emails = self
+
+        def send(self, payload):
+            sent_payloads.append((self.api_key, payload))
+            return {"id": "email-id"}
+
+    monkeypatch.setattr(mailer.resend, "Resend", FakeClient, raising=False)
+    monkeypatch.setattr(mailer.config, "RESEND_API_KEY", "re_test")
+    monkeypatch.setattr(mailer.config, "EMAIL_FROM", "Vellum <vellum@example.com>")
 
     await mailer.send("dest@example.com", "subject", "<p>body</p>")
 
-    assert fake_gmail.attempts == 2
-
-
-async def test_send_raises_after_gmail_rate_limit_retries(monkeypatch, fake_gmail):
-    monkeypatch.setattr(mailer.config, "MAILER_SEND_RETRY_ATTEMPTS", 1)
-    fake_gmail.failures.append(
-        HttpError(
-            _FakeResp(),
-            b'{"error": {"message": "User-rate limit exceeded", "reason": "rateLimitExceeded"}}',
+    assert sent_payloads == [
+        (
+            "re_test",
+            {
+                "from": "Vellum <vellum@example.com>",
+                "to": ["dest@example.com"],
+                "subject": "subject",
+                "html": "<p>body</p>\n",
+            },
         )
-    )
-
-    with pytest.raises(mailer.MailerRateLimitExceeded):
-        await mailer.send("dest@example.com", "subject", "<p>body</p>")
+    ]

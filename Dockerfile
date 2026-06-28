@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir \
     openai==2.44.0 \
     pydantic==2.13.4 \
     python-dotenv==1.2.2 \
+    resend==2.32.2 \
     "google-api-python-client==2.198.0" \
     "google-auth-oauthlib==1.4.0" \
     "google-cloud-storage==3.12.0"

@@ -129,17 +129,18 @@ async def process_request(parsed: ParsedRequest, dry_run: bool = False) -> JobRe
     download_url: str | None = None
     attachment: Path | None = zip_path
     size_mb = zip_path.stat().st_size / (1024 * 1024)
-    if config.GCS_BUCKET and size_mb > config.MAX_ATTACHMENT_MB and not dry_run:
+    if config.GCS_BUCKET and not dry_run and (config.RESEND_API_KEY or size_mb > config.MAX_ATTACHMENT_MB):
         download_url = await asyncio.to_thread(
             storage.upload_archive, zip_path, parsed.request_id
         )
         attachment = None
         logger.info(
-            "archive too large to attach, sending download link",
+            "sending archive as download link",
             extra={
                 "step": "queue.deliver",
                 "size_mb": round(size_mb, 1),
                 "limit_mb": config.MAX_ATTACHMENT_MB,
+                "resend_delivery": bool(config.RESEND_API_KEY),
             },
         )
 
